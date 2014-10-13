@@ -36,8 +36,15 @@
 
 (define x86-instructions
   '((mov (operand operand))
+    (xor (operand operand))
+    (div (operand))
+    (add (operand operand))
+    (test (operand operand))
     (push (operand)) (pop (operand))
     (call (label)) (ret ())
+    (jz (label))
+    (jmp (label))
+    (syscall ())
     ))
 
 (define (x86-emit program)
@@ -51,10 +58,28 @@
          (labels (filter symbol? instructions)))
     (if (not (member '__start labels))
         (error "Program has no __start label")
-        (for-each (lambda (inst) (x86-emit-instruction vars labels inst))
-                  instructions))))
+        (begin
+          (display "section .data") (newline)
+          (for-each x86-emit-data-decl data)
+          (display "section .text") (newline)
+          (display "global _start") (newline)
+          (for-each (lambda (inst) (x86-emit-instruction vars labels inst))
+                    instructions)))))
 
 (define x86-indentation "    ")
+
+(define (x86-emit-data-decl decl)
+  (display (first decl))
+  (display ": ")
+  (display (second decl))
+  (display " ")
+  (write (third decl))
+  (let loop ((xs (cdddr decl)))
+    (cond ((null? xs) '())
+          (else (display ", ")
+                (write (car xs))
+                (loop (cdr xs)))))
+  (newline))
 
 (define (x86-emit-instruction variables labels instruction)
   ;; TODO: check that mov's are valid against the mov table
@@ -85,7 +110,7 @@
                                   (display (car operands))))
                              ((label) (display (car operands)))
                              (else (error "Unknown operand type: " t)))))
-                     (if (null? (cdr operands))
+                     (if (or (null? operands) (null? (cdr operands)))
                          #f
                          (begin
                            (display ",")
